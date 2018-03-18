@@ -13,7 +13,7 @@
 import numpy as np
 import time
 from . pygame_utils import Window, ComplexPlane
-from . opencl_complex import calc_fractal_opencl, BUFALO_SHIP, DUCK
+from . opencl_complex import calc_fractal_opencl, BUFALO_SHIP, DUCK, POWDUCK
 
 
 class BurningJuliaSet(Window, ComplexPlane):
@@ -38,6 +38,8 @@ class BurningJuliaSet(Window, ComplexPlane):
             f = BUFALO_SHIP
         elif self.variant == "duck":
             f = DUCK
+        elif self.variant == "powduck":
+            f = POWDUCK
         nparray = calc_fractal_opencl(q, "juliaship", self.max_iter, self.args,
                                       seed=self.c, f=f)
         self.blit(nparray)

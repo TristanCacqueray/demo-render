@@ -38,7 +38,17 @@ Sandpile fractal, from [this video](https://www.youtube.com/watch?v=1MtEUErz7Gg)
 
 # [animations](animations/)
 
-Midi/Spectrogram based animation of the JuliaSet.
+Midi/Spectrogram based animation of iterated complex function fractal.
+
+[gobansan](animations/gobansan.py)
+
+![ggb](animations/gobansan.jpg)
+
+
+[profondeur](animations/profondeur.py)
+
+![profondeur](animations/profondeur.jpg)
+
 
 [ggb](animations/ggb.py)
 

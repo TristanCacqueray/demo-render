@@ -19,7 +19,13 @@ except ImportError:
 
 DUCK = """
 z.imag = fabs(z.imag);
-//z = cdouble_powr(z, 2);
+z = cdouble_add(z, c);
+z = cdouble_log(z);
+"""
+
+POWDUCK = """
+z.imag = fabs(z.imag);
+z = cdouble_powr(z, 2);
 z = cdouble_add(z, c);
 z = cdouble_log(z);
 """
@@ -83,7 +89,6 @@ def calc_fractal_opencl(q, fractal, maxiter, args, seed=None, mod=None, f=None):
             extra_arg = ", double const mod"
             init_rseed_value = "q[gid].x"
             init_iseed_value = "q[gid].y"
-        print(f)
         prg_src.append("""
         #define PYOPENCL_DEFINE_CDOUBLE 1
         #include <pyopencl-complex.h>
@@ -175,6 +180,5 @@ def calc_fractal_opencl(q, fractal, maxiter, args, seed=None, mod=None, f=None):
         prg.juliaship(queue, output.shape, None, q_opencl,
                       output_opencl, np.uint32(maxiter), np.double(args.gradient_frequency),
                       np.double(seed.real), np.double(seed.imag), np.double(args.mod))
-
     cl.enqueue_copy(queue, output, output_opencl).wait()
     return output
