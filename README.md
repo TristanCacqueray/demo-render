@@ -40,6 +40,11 @@ Sandpile fractal, from [this video](https://www.youtube.com/watch?v=1MtEUErz7Gg)
 
 Midi/Spectrogram based animation of iterated complex function fractal.
 
+[waldo](animations/waldo.py)
+
+![waldo](animations/waldo.png)
+
+
 [buttons](animations/buttons.py)
 
 ![buttons](animations/buttons.png)

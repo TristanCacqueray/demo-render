@@ -58,9 +58,6 @@ class MidiMod:
             decay = (self.prev_val - val) / self.decay
             val = self.prev_val - decay
         self.prev_val = val
-        if val < 0:
-            print("YAyaya, %s" % val)
-            exit(0)
         return val
 
 
