@@ -257,24 +257,30 @@ class Controller:
                 self.scene.draw = False
                 self.scene.map_scene.draw = True
                 if self.params["mods"][mod[0]].get("map_center"):
-                    self.params["map_center_real"] = self.params["c_real"]
-                    self.params["map_center_imag"] = self.params["c_imag"]
+                    x, y = "real", "imag"
+                    if self.params["xyinverted"]:
+                        x, y = "imag", "real"
+                    self.params["map_center_real"] = self.params["c_" + x]
+                    self.params["map_center_imag"] = self.params["c_" + y]
             self.update_sliders()
             return
 
         direction = 1
         key = CODE2KEY.get(scancode)
+        x, y = "real", "imag"
+        if self.params.get("xyinverted"):
+            x, y = "imag", "real"
         if key == "ESCAPE":
             self.scene.draw = False
             self.scene.alive = False
         elif key in ('q', 'd'):
             if key == 'q':
                 direction = -1
-            self.params["c_real"] += direction * self.params["r_step"]
+            self.params["c_" + x] += direction * self.params["r_step"]
         elif key in ('s', 'z'):
             if key == 'z':
                 direction = -1
-            self.params["c_imag"] += direction * self.params["i_step"]
+            self.params["c_" + y] += direction * self.params["i_step"]
         elif key == 'm':
             # Show/hide map
             self.params["show_map"] = not self.params["show_map"]

@@ -32,6 +32,38 @@ def midi_varlen(fobj):
             return value
 
 
+class MidiMod:
+    def __init__(self, track, mod="pitch", event="chords", decay=10):
+        self.track = track
+        self.event = event
+        self.decay = decay
+        self.master_decay = decay
+        self.mod = mod
+        self.prev_val = 0
+
+    def update(self, midi_events):
+        val = 0
+        for event in midi_events:
+            if event["track"] != self.track:
+                continue
+            for ev in event["ev"]:
+                if ev["type"] == self.event:
+                    if self.mod == "pitch":
+                        max_pitch = max(list(ev["pitch"].keys()))
+                        val = max_pitch / 127.0
+                        self.decay = ev["pitch"][max_pitch] / self.master_decay
+                    elif self.mod == "one-off":
+                        val = 1
+        if self.prev_val > val:
+            decay = (self.prev_val - val) / self.decay
+            val = self.prev_val - decay
+        self.prev_val = val
+        if val < 0:
+            print("YAyaya, %s" % val)
+            exit(0)
+        return val
+
+
 class Midi:
     log = logging.getLogger("midi")
 
@@ -112,10 +144,12 @@ class Midi:
                             self.tempo = ((data[0] << 16) |
                                           (data[1] << 8) |
                                           (data[2]))
-                            self.log.debug(
-                                "BPM", tck_pos, (60 * 1000000) / self.tempo)
+                            self.log.debug("BPM %s %s",
+                                           tck_pos,
+                                           (60 * 1000000) / self.tempo)
                         else:
-                            self.log.debug("Meta 0x%x: %s", cmd, data)
+                            self.log.debug(
+                                "%s: Meta 0x%x: %s", trk_nr, cmd, data)
                             if cmd == 0x3:
                                 track_name = data.decode('utf-8')
                     elif etype == 0xf0:
@@ -148,12 +182,21 @@ class Midi:
                         self.log.warning("Unknown event: 0x%X (%X / %X)" % (
                             etype, mtype, mchan))
                     last_tck_pos = tck_pos
+            if events:
+                track['name'] = track_name
+                track['events'] = events
+                track['pos'] = 0
+                self.tracks.append(track)
+
         if len(pos_map):
             pickle.dump(self.tracks, open("%s.pck" % fn, "wb"))
 
     def normalize(self, fps):
         self.frames = []
         pos = 1 / fps
+        for track in self.tracks:
+            self.log.debug(
+                "Track: %s len %d", track["name"], len(track["events"]))
         while True:
             eof = True
             frame = []

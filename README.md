@@ -40,6 +40,14 @@ Sandpile fractal, from [this video](https://www.youtube.com/watch?v=1MtEUErz7Gg)
 
 Midi/Spectrogram based animation of iterated complex function fractal.
 
+[buttons](animations/buttons.py)
+
+![buttons](animations/buttons.png)
+![buttons](animations/buttons-2.png)
+![buttons](animations/buttons-3.png)
+![buttons](animations/buttons-4.png)
+
+
 [acidula-beat](animations/acidula-beat.py)
 
 ![acidula-beat](animations/acidula-beat.png)

@@ -12,6 +12,7 @@
 
 import argparse
 import json
+import logging
 import os
 import time
 
@@ -26,7 +27,7 @@ from . midi import Midi, NoMidi
 
 def usage():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--debug", action='store_true')
+    parser.add_argument("--paused", action='store_true')
     parser.add_argument("--record", metavar="DIR", help="record frame in png")
     parser.add_argument("--wav", metavar="FILE")
     parser.add_argument("--midi", metavar="FILE")
@@ -37,10 +38,15 @@ def usage():
                         help="render size (2.5)")
     parser.add_argument("--super-sampling", type=int,
                         help="super sampling mode")
+    parser.add_argument("--debug", action="store_true",
+                        help="show debug information")
     args = parser.parse_args()
     args.winsize = list(map(lambda x: int(x * args.size), [160,  90]))
     args.map_size = list(map(lambda x: x//5, args.winsize))
     args.length = args.winsize[0] * args.winsize[1]
+    logging.basicConfig(
+        format='%(asctime)s %(levelname)-5.5s %(name)s - %(message)s',
+        level=logging.DEBUG if args.debug else logging.INFO)
     return args
 
 
@@ -51,6 +57,7 @@ class Animation(Controller):
             length = self.scenes[idx - 1][0] - self.scenes[idx][0]
             self.scenes[idx].insert(1, length)
         self.end_frame = self.scenes[0][0]
+        self.midi_events = {}
         super().__init__(params)
 
     def setAudio(self, audio):
@@ -59,11 +66,15 @@ class Animation(Controller):
     def updateAudio(self, audio_buf):
         pass
 
-    def setMidi(self, midi):
+    def setMidi(self, midi, midi_skip):
         self.midi = midi
+        self.midi_skip = midi_skip
 
     def updateMidi(self, midi_events):
-        pass
+        for k, v in self.midi_events.items():
+            setattr(self, k, v.update(midi_events))
+        if midi_events:
+            print(midi_events)
 
     def geomspace(self, start, end):
         return np.geomspace(start, end, self.scene_length)
@@ -86,7 +97,7 @@ class Animation(Controller):
             except IndexError:
                 pass
             try:
-                midi_events = self.midi.get(frame)
+                midi_events = self.midi.get(frame + self.midi_skip)
                 self.updateMidi(midi_events)
             except IndexError:
                 pass
@@ -102,7 +113,8 @@ class Animation(Controller):
                 break
         if idx == len(self.scenes):
             raise RuntimeError("Couldn't find scene for frame %d" % frame)
-        func(frame)
+        if not self.paused:
+            func(frame)
         super().update(frame)
 
 
@@ -119,7 +131,7 @@ def run_main(demo, Scene=Fractal):
         midi = Midi(args.midi)
     else:
         midi = NoMidi()
-    demo.setMidi(midi)
+    demo.setMidi(midi, args.midi_skip)
 
     if args.super_sampling:
         demo.params["super_sampling"] = args.super_sampling
@@ -148,6 +160,11 @@ def run_main(demo, Scene=Fractal):
         demo.update(frame)
         if not demo.paused:
             frame += 1
+
+        if args.paused:
+            demo.paused = True
+            args.paused = False
+
         if scene.render(frame):
             screen.update()
             if args.record:
@@ -161,11 +178,11 @@ def run_main(demo, Scene=Fractal):
 
     if args.record:
         import subprocess
-        subprocess.Popen([
+        cmd = [
             "ffmpeg", "-y", "-framerate", str(args.fps),
-            "-start_number", str(args.skip),
             "-i", "%s/%%04d.png" % args.record,
             "-i", args.wav,
             "-c:a", "libvorbis", "-c:v", "copy",
-            "%s/%04d-render.mp4" % (args.record, args.skip)
-        ]).wait()
+            "%s/render.mp4" % (args.record)]
+        print("Running: %s" % " ".join(cmd))
+        subprocess.Popen(cmd).wait()
