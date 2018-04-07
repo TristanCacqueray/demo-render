@@ -34,6 +34,8 @@ def midi_varlen(fobj):
 
 class MidiMod:
     def __init__(self, track, mod="pitch", event="chords", decay=10):
+        if not isinstance(track, list):
+            track = [track]
         self.track = track
         self.event = event
         self.decay = decay
@@ -44,7 +46,7 @@ class MidiMod:
     def update(self, midi_events):
         val = 0
         for event in midi_events:
-            if event["track"] != self.track:
+            if event["track"] not in self.track:
                 continue
             for ev in event["ev"]:
                 if ev["type"] == self.event:
@@ -54,6 +56,7 @@ class MidiMod:
                         self.decay = ev["pitch"][max_pitch] / self.master_decay
                     elif self.mod == "one-off":
                         val = 1
+            break
         if self.prev_val > val:
             decay = (self.prev_val - val) / self.decay
             val = self.prev_val - decay

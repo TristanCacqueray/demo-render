@@ -40,6 +40,33 @@ Sandpile fractal, from [this video](https://www.youtube.com/watch?v=1MtEUErz7Gg)
 
 Midi/Spectrogram based animation of iterated complex function fractal.
 
+[comptine](animations/comptine.py)
+
+![comptine](animations/comptine.png)
+![comptine](animations/comptine-2.png)
+
+
+[weightless-morning](animations/weightless-morning.py)
+
+![weightless-morning](animations/weightless-morning.png)
+![weightless-morning](animations/weightless-morning-2.png)
+![weightless-morning](animations/weightless-morning-3.png)
+![weightless-morning](animations/weightless-morning-4.png)
+
+
+[maintenance](animations/maintenance.py)
+
+![maintenance](animations/maintenance.png)
+![maintenance](animations/maintenance-2.png)
+![maintenance](animations/maintenance-3.png)
+![maintenance](animations/maintenance-4.png)
+
+
+[siouze](animations/siouze.py)
+
+![siouze](animations/siouze.png)
+![siouze](animations/siouze-2.png)
+
 [waldo](animations/waldo.py)
 
 ![waldo](animations/waldo.png)

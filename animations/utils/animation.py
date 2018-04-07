@@ -58,13 +58,18 @@ class Animation(Controller):
             self.scenes[idx].insert(1, length)
         self.end_frame = self.scenes[0][0]
         self.midi_events = {}
+        self.audio_events = {}
+        self.spectre = None
         super().__init__(params)
 
     def setAudio(self, audio):
         self.audio = audio
 
     def updateAudio(self, audio_buf):
-        pass
+        if self.spectre is not None:
+            self.spectre.transform(audio_buf)
+            for k, v in self.audio_events.items():
+                setattr(self, k, v.update(self.spectre))
 
     def setMidi(self, midi, midi_skip):
         self.midi = midi
@@ -102,6 +107,9 @@ class Animation(Controller):
             except IndexError:
                 pass
             self.scene.draw = True
+            if self.audio.play:
+                self.update_sliders()
+
         if frame >= self.end_frame:
             self.scene.alive = False
             return
@@ -154,6 +162,7 @@ def run_main(demo, Scene=Fractal):
     for skip in range(args.skip):
         demo.update(skip)
     audio.play = not args.record
+    demo.update_sliders()
 
     while True and scene.alive:
         start_time = time.monotonic()
