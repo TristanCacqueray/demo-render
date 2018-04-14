@@ -15,7 +15,17 @@ import io
 import math
 
 
-class GimpGradient:
+class Gradient:
+    multi_gradients = False
+
+    def to_array(self, length):
+        colors_array = []
+        for idx in range(length):
+            colors_array.append(str(self.color(idx / length)))
+        return ",".join(colors_array)
+
+
+class GimpGradient(Gradient):
     """ Read and interpret a Gimp .ggr gradient file.
         Code adapted from https://nedbatchelder.com/code/modules/ggr.html
     """
@@ -103,15 +113,44 @@ class GimpGradient:
                     int((c[1] * 0xff)) << 8 |
                     int(c[2] * 0xff))
 
-    def to_array(self, length):
-        colors_array = []
-        for idx in range(length):
-            colors_array.append(str(self.color(idx / length)))
-        return ",".join(colors_array)
+
+class Ugr(Gradient):
+    def __init__(self, f, name=None):
+        self.gradients = {}
+        if isinstance(f, str):
+            f = open(f)
+        gradient = []
+        while True:
+            line = f.readline()
+            if line == '':
+                break
+            if "}" in line:
+                self.gradients[gradient[0]] = gradient[1]
+            if "title=" in line:
+                gradient = [line.split('"')[1], []]
+                if name is None:
+                    self.multi_gradients = True
+                    name = gradient[0]
+            if "color=" in line:
+                gradient[1].append(int(line.split('=')[-1]))
+        if name not in self.gradients:
+            raise RuntimeError("Unknown gradient %s in %s" % (
+                name, list(self.gradients.keys())))
+        self.name = name
+
+    def color(self, x, name=None):
+        if name is None:
+            name = self.name
+        pos = int(len(self.gradients[name]) * x)
+        return self.gradients[name][pos]
 
 
 def get(name):
     import os
+
+    gname = None
+    if ":" in name:
+        name, gname = name.split(':')
 
     local_file = os.path.join(os.path.dirname(__file__), "gradients", name)
     if os.path.exists(local_file):
@@ -121,8 +160,10 @@ def get(name):
     else:
         if name.endswith(".ggr"):
             gradient = GimpGradient(name)
+        elif name.endswith(".ugr"):
+            gradient = Ugr(name, gname)
         else:
-            raise RuntimeError("Only GimpGradient format is supported")
+            raise RuntimeError("Only GimpGradient/UGR format is supported")
     return gradient
 
 
@@ -173,12 +214,22 @@ if __name__ == '__main__':
     screen.add(window)
 
     for name in sys.argv[1:]:
-        print(name, end='')
         gradient = get(name)
 
-        for x in range(WINSIZE[0]):
-            window.draw_line((x, 0),
-                             (x, WINSIZE[1]),
-                             gradient.color(x / WINSIZE[0]))
-        screen.update()
-        input()
+        if gradient.multi_gradients:
+            for gname in gradient.gradients:
+                print("%s:%s" % (name, gname), end='')
+                for x in range(WINSIZE[0]):
+                    window.draw_line((x, 0),
+                                     (x, WINSIZE[1]),
+                                     gradient.color(x / WINSIZE[0], gname))
+                screen.update()
+                input()
+        else:
+            print(name, end='')
+            for x in range(WINSIZE[0]):
+                window.draw_line((x, 0),
+                                 (x, WINSIZE[1]),
+                                 gradient.color(x / WINSIZE[0]))
+            screen.update()
+            input()
