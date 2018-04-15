@@ -40,6 +40,13 @@ Sandpile fractal, from [this video](https://www.youtube.com/watch?v=1MtEUErz7Gg)
 
 Midi/Spectrogram based animation of iterated complex function fractal.
 
+[EoJ](animations/EoJ.py)
+
+![EoJ](animations/EoJ.png)
+![EoJ](animations/EoJ-2.png)
+![EoJ](animations/EoJ-3.png)
+![EoJ](animations/EoJ-4.png)
+
 [inline](animations/inline.py)
 
 ![inline](animations/inline.png)
