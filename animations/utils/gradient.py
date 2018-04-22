@@ -43,13 +43,16 @@ class GimpGradient(Gradient):
         if f.readline().strip() != "GIMP Gradient":
             raise Exception("Not a GIMP gradient file")
         line = f.readline().strip()
-        if not line.startswith("Name: "):
-            raise Exception("Not a GIMP gradient file")
-        self.name = line.split(": ", 1)[1]
-        nsegs = int(f.readline().strip())
+        if line.startswith("Name: "):
+            #raise Exception("Not a GIMP gradient file")
+            self.name = line.split(": ", 1)[1]
+            line = f.readline().strip()
+        nsegs = int(line)
         self.segs = []
         for i in range(nsegs):
             line = f.readline().strip()
+            if not line:
+                break
             seg = self._segment()
             (seg.k, seg.m, seg.r,
                 seg.rl, seg.gl, seg.bl, _,
@@ -120,6 +123,7 @@ class Ugr(Gradient):
         if isinstance(f, str):
             f = open(f)
         gradient = []
+        last_index = 0
         while True:
             line = f.readline()
             if line == '':
@@ -127,12 +131,31 @@ class Ugr(Gradient):
             if "}" in line:
                 self.gradients[gradient[0]] = gradient[1]
             if "title=" in line:
+                last_index = 0
                 gradient = [line.split('"')[1], []]
                 if name is None:
                     self.multi_gradients = True
                     name = gradient[0]
             if "color=" in line:
-                gradient[1].append(int(line.split('=')[-1]))
+                index = int(line.split('index=')[1].split()[0])
+                c = int(line.split('color=')[1].split()[0])
+                if last_index != index:
+                    # Inject transition color
+                    lc = gradient[1][-1]
+                    lr, lg, lb = (lc >> 16) & 0xff, (lc >> 8) & 0xff, lc & 0xff
+                    nr, ng, nb = (c >> 16) & 0xff, (c >> 8) & 0xff, c & 0xff
+                    r = 1 + index - last_index
+                    for idx in range(r):
+                        gradient[1].append(
+                            0xff << 24 |
+                            (int(lr + (nr - lr) * idx / r) & 0xff) << 16 |
+                            (int(lg + (ng - lg) * idx / r) & 0xff) << 8 |
+                            (int(lb + (nb - lb) * idx / r) & 0xff)
+
+                        )
+                last_index = index
+
+                gradient[1].append(0xff << 24 | c)
         if name not in self.gradients:
             raise RuntimeError("Unknown gradient %s in %s" % (
                 name, list(self.gradients.keys())))

@@ -89,6 +89,23 @@ __constant uint gradient[] = {{{gradient_values}}};
 #include <pyopencl-complex.h>
 #pragma OPENCL EXTENSION cl_khr_byte_addressable_store : enable
 #pragma OPENCL EXTENSION cl_khr_fp64 : enable
+
+cdouble_t cdouble_iabs(cdouble_t t) {{
+    t.imag = fabs(t.imag);
+    return t;
+}}
+
+cdouble_t cdouble_rabs(cdouble_t t) {{
+    t.real = fabs(t.real);
+    return t;
+}}
+
+cdouble_t cdouble_fabs(cdouble_t t) {{
+    t.real = fabs(t.real);
+    t.imag = fabs(t.imag);
+    return t;
+}}
+
 __kernel void compute(
     __global double2 *plane,
     __global uint *pixels,

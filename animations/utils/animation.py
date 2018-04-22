@@ -60,6 +60,7 @@ class Animation(Controller):
         self.midi_events = {}
         self.audio_events = {}
         self.spectre = None
+        self.silent = False
         super().__init__(params)
 
     def setAudio(self, audio):
@@ -78,7 +79,7 @@ class Animation(Controller):
     def updateMidi(self, midi_events):
         for k, v in self.midi_events.items():
             setattr(self, k, v.update(midi_events))
-        if midi_events:
+        if not self.silent and midi_events:
             print(midi_events)
 
     def geomspace(self, start, end):
@@ -159,8 +160,10 @@ def run_main(demo, Scene=Fractal):
     # Warm opencl
     scene.render(0)
     audio.play = False
+    demo.silent = True
     for skip in range(args.skip):
         demo.update(skip)
+    demo.silent = False
     audio.play = not args.record
     demo.update_sliders()
 

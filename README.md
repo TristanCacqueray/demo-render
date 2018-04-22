@@ -40,12 +40,38 @@ Sandpile fractal, from [this video](https://www.youtube.com/watch?v=1MtEUErz7Gg)
 
 Midi/Spectrogram based animation of iterated complex function fractal.
 
+[memosp2](animations/memosp2.py)
+
+![memosp2](animations/memosp2.png)
+![memosp2](animations/memosp2-2.png)
+![memosp2](animations/memosp2-3.png)
+![memosp2](animations/memosp2-4.png)
+
+
+[oldchords](animations/oldchords.py)
+
+![oldchords](animations/oldchords.png)
+![oldchords](animations/oldchords-2.png)
+![oldchords](animations/oldchords-3.png)
+![oldchords](animations/oldchords-4.png)
+
+
+
+[anvil](animations/anvil.py)
+
+![anvil](animations/anvil.png)
+![anvil](animations/anvil-2.png)
+![anvil](animations/anvil-3.png)
+![anvil](animations/anvil-4.png)
+
+
 [EoJ](animations/EoJ.py)
 
 ![EoJ](animations/EoJ.png)
 ![EoJ](animations/EoJ-2.png)
 ![EoJ](animations/EoJ-3.png)
 ![EoJ](animations/EoJ-4.png)
+
 
 [inline](animations/inline.py)
 
