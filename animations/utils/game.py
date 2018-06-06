@@ -65,6 +65,9 @@ class Window:
     def draw_line(self, start_coord, end_coord, color=(28, 28, 28)):
         pygame.draw.line(self.surface, color, start_coord, end_coord)
 
+    def draw_circle(self, coord, size, color=(28, 28, 28)):
+        pygame.draw.circle(self.surface, color, coord, size)
+
     def draw_point(self, coord, color=[242]*3):
         self.surface.set_at(coord, color)
 

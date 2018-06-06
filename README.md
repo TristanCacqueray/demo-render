@@ -12,6 +12,14 @@ The duck set fractal, from
 ![smiley](quack/smiley.png)
 
 
+# [numbers-on-a-flower](flower-seeds.py)
+Flower seeds distribution representation based on
+[this video](https://www.youtube.com/watch?v=sj8Sg8qnjOg)
+
+![flower-seeds](flower-seeds.png)
+![flower-golden](flower-golden.png)
+
+
 # [multiplication-on-a-circle](multiplication-on-a-circle.py)
 
 Multiplication table on a circle from

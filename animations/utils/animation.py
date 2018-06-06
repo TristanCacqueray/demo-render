@@ -61,7 +61,7 @@ class Animation(Controller):
         self.audio_events = {}
         self.spectre = None
         self.silent = False
-        super().__init__(params)
+        super().__init__(params, default={})
 
     def setAudio(self, audio):
         self.audio = audio
@@ -166,6 +166,8 @@ def run_main(demo, Scene=Fractal):
     demo.silent = False
     audio.play = not args.record
     demo.update_sliders()
+
+    scene.alive = True
 
     while True and scene.alive:
         start_time = time.monotonic()

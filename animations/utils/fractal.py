@@ -149,12 +149,10 @@ __kernel void compute(
 }
 
 
-
 class Fractal(game.Window, game.ComplexPlane):
     def __init__(self, winsize, params, gpu=None):
         game.Window.__init__(self, winsize)
         self.params = params
-        self.alive = True
         self.draw = True
         self.mapmode = False
         self.map_scene = None

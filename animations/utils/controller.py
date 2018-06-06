@@ -108,11 +108,12 @@ for k, v in KEY2CODE.items():
 
 
 class Controller:
-    def __init__(self, params, variant=None):
-        for k, v in DEFAULT_PARAMETERS.items():
+    def __init__(self, params, variant=None, default=DEFAULT_PARAMETERS):
+        for k, v in default.items():
             if k not in params:
                 params[k] = v
-        for k, v in DEFAULT_PARAMETERS["mods"].items():
+        params.setdefault("mods", {})
+        for k, v in default.get("mods", {}).items():
             if k not in params.get("mods", {}):
                 params.setdefault("mods", {})[k] = v
         self.start_params = copy.copy(params)
@@ -136,7 +137,7 @@ class Controller:
             elif mod_param.get("type") == "ratio":
                 self.keymaps[keys[0]] = [mod, "mul", (res+1)/res]
                 self.keymaps[keys[1]] = [mod, "mul", (res-1)/res]
-        if not tk_ftw:
+        if not tk_ftw or not params["mods"]:
             self.root = None
             return
         self.root = tkinter.Tk()
