@@ -55,6 +55,13 @@ Sandpile fractal, from [this video](https://www.youtube.com/watch?v=1MtEUErz7Gg)
 
 Midi/Spectrogram based animation of iterated complex function fractal.
 
+[kalygg.py](animations/kalygg.py)
+
+![kalygg](animations/kalygg.png)
+![kalygg](animations/kalygg-2.png)
+![kalygg](animations/kalygg-3.png)
+
+
 [rokano.py](animations/rokano.py)
 
 ![rokano](animations/rokano.png)
