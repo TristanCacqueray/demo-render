@@ -55,6 +55,14 @@ Sandpile fractal, from [this video](https://www.youtube.com/watch?v=1MtEUErz7Gg)
 
 Midi/Spectrogram based animation of iterated complex function fractal.
 
+[mozaic fall.py](animations/mozaic_fall.py)
+
+![mozaic fall](animations/mozaic_fall.png)
+![mozaic fall](animations/mozaic_fall-2.png)
+![mozaic fall](animations/mozaic_fall-3.png)
+![mozaic fall](animations/mozaic_fall-4.png)
+
+
 [kalygg.py](animations/kalygg.py)
 
 ![kalygg](animations/kalygg.png)
