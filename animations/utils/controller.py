@@ -14,7 +14,6 @@ import copy
 import pprint
 import time
 
-import numpy as np
 import pygame
 import pygame.locals
 try:
@@ -153,6 +152,7 @@ class Controller:
                 self.add_float(mod,
                                mod_param["min"], mod_param["max"],
                                mod_param["resolution"])
+
         # Give tcl/tk sometime to reserve resources
         self.root.update()
         time.sleep(0.23)
@@ -332,6 +332,12 @@ class Controller:
             self.scene.draw = False
 
     def update(self, frame):
+        if self.params["show_map"] and self.params["julia"]:
+            if not self.scene.map_scene:
+                self.scene.create_map_scene(self.map_size, self.params)
+            main = self.screen.windows[0]
+            self.screen.windows = [main, (self.scene.map_scene, (0, 0))]
+
         if self.root:
             self.root.update()
         for ev in pygame.event.get():

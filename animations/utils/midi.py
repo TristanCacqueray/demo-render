@@ -56,6 +56,10 @@ class MidiMod:
                         self.decay = ev["pitch"][max_pitch] / self.master_decay
                     elif self.mod == "one-off":
                         val = 1
+                    elif self.mod.startswith("ev-"):
+                        for ev_pitch in self.mod.split('-')[1:]:
+                            if int(ev_pitch) in ev["pitch"]:
+                                val = 1
             break
         if self.prev_val > val:
             decay = (self.prev_val - val) / self.decay

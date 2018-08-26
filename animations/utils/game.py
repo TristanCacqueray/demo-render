@@ -62,14 +62,17 @@ class Window:
         text = self.font.render(msg, True, color)
         self.surface.blit(text, coord)
 
-    def draw_line(self, start_coord, end_coord, color=(28, 28, 28)):
-        pygame.draw.line(self.surface, color, start_coord, end_coord)
+    def draw_line(self, start_coord, end_coord, color=(28, 28, 28), width=1):
+        pygame.draw.line(self.surface, color, start_coord, end_coord, width)
 
     def draw_circle(self, coord, size, color=(28, 28, 28)):
         pygame.draw.circle(self.surface, color, coord, size)
 
-    def draw_point(self, coord, color=[242]*3):
-        self.surface.set_at(coord, color)
+    def draw_point(self, coord, color=[242]*3, width=1):
+        if width > 1:
+            self.draw_circle(coord, width, color)
+        else:
+            self.surface.set_at(coord, color)
 
     def blit(self, nparray):
         pygame.surfarray.blit_array(
@@ -108,9 +111,10 @@ class ComplexPlane:
                complex_coord.real < self.plane_max[0] and \
                complex_coord.imag < self.plane_max[1]
 
-    def draw_complex(self, complex_coord, color=[242]*3):
+    def draw_complex(self, complex_coord, color=[242]*3, width=1):
         if self.included(complex_coord):
-            self.draw_point(self.convert_to_screen(complex_coord), color)
+            self.draw_point(
+                self.convert_to_screen(complex_coord), color, width)
 
     def draw_axis(self, axis_color=(28, 28, 28)):
         center_coord = self.convert_to_screen(0j)

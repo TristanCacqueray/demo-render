@@ -51,7 +51,7 @@ def usage():
 
 
 class Animation(Controller):
-    def __init__(self, params):
+    def __init__(self, params, default={}):
         # Insert scene length
         for idx in range(1, len(self.scenes)):
             length = self.scenes[idx - 1][0] - self.scenes[idx][0]
@@ -61,12 +61,12 @@ class Animation(Controller):
         self.audio_events = {}
         self.spectre = None
         self.silent = False
-        super().__init__(params, default={})
+        super().__init__(params)
 
     def setAudio(self, audio):
         self.audio = audio
 
-    def updateAudio(self, audio_buf):
+    def updateAudio(self, audio_buf, frame=None):
         if self.spectre is not None:
             self.spectre.transform(audio_buf)
             for k, v in self.audio_events.items():
@@ -76,7 +76,7 @@ class Animation(Controller):
         self.midi = midi
         self.midi_skip = midi_skip
 
-    def updateMidi(self, midi_events):
+    def updateMidi(self, midi_events, frame=None):
         for k, v in self.midi_events.items():
             setattr(self, k, v.update(midi_events))
         if not self.silent and midi_events:
@@ -99,12 +99,12 @@ class Animation(Controller):
         if not self.paused:
             try:
                 audio_buf = self.audio.get(frame)
-                self.updateAudio(audio_buf)
+                self.updateAudio(audio_buf, frame)
             except IndexError:
                 pass
             try:
                 midi_events = self.midi.get(frame + self.midi_skip)
-                self.updateMidi(midi_events)
+                self.updateMidi(midi_events, frame)
             except IndexError:
                 pass
             self.scene.draw = True

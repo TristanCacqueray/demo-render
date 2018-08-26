@@ -55,6 +55,15 @@ Sandpile fractal, from [this video](https://www.youtube.com/watch?v=1MtEUErz7Gg)
 
 Midi/Spectrogram based animation of iterated complex function fractal.
 
+[maintenance2.py](animations/maintenance2.py)
+
+![maintenance2](animations/maintenance2.png)
+![maintenance2](animations/maintenance2-2.png)
+![maintenance2](animations/maintenance2-3.png)
+![maintenance2](animations/maintenance2-4.png)
+![maintenance2](animations/maintenance2-5.png)
+
+
 [duna2.py](animations/duna2.py)
 
 ![duna2](animations/duna2.png)
