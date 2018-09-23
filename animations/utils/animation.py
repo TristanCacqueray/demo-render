@@ -63,6 +63,9 @@ class Animation(Controller):
         self.silent = False
         super().__init__(params)
 
+    def pause(self, frame):
+        self.paused = True
+
     def setAudio(self, audio):
         self.audio = audio
 

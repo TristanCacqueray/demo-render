@@ -12,13 +12,19 @@ The duck set fractal, from
 ![smiley](quack/smiley.png)
 
 
-# [numbers-on-a-flower.py](flower-seeds.py)
+# [flower-seeds.py](flower-seeds.py)
 
 Flower seeds distribution representation based on
 [this video](https://www.youtube.com/watch?v=sj8Sg8qnjOg)
 
 ![flower-seeds](flower-seeds.png)
 ![flower-golden](flower-golden.png)
+
+
+[flower-seeds-gl.py](animations/flower-seeds-gl.py)
+![flower-seeds](animations/flower-seeds-gl.png)
+![flower-seeds](animations/flower-seeds-gl-2.png)
+![flower-seeds](animations/flower-seeds-gl-3.png)
 
 
 # [multiplication-on-a-circle.py](multiplication-on-a-circle.py)
