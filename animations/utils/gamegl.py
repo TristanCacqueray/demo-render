@@ -29,11 +29,12 @@ class Window(EventDispatcher):
     alive = True
     draw = True
 
-    def __init__(self, winsize, screen, demo):
+    def __init__(self, winsize, screen, demo, record):
         self.winsize = winsize
         self.window = screen
         self.demo = demo
         self.params = demo.params
+        self.dorecord = record
         self.init_program()
         self.fbuffer = np.zeros(
             (self.window.height, self.window.width * 3), dtype=np.uint8)
@@ -79,7 +80,7 @@ def usage():
 def run_main(demo, Scene):
     args = usage()
     screen = app.Window(width=args.winsize[0], height=args.winsize[1])
-    scene = Scene(args.winsize, screen, demo)
+    scene = Scene(args.winsize, screen, demo, args.record)
     screen.attach(scene)
 
     backend = app.__backend__
@@ -127,9 +128,10 @@ def run_main(demo, Scene):
                 frame, time.monotonic() - start_time,
                 json.dumps(demo.get(), sort_keys=True)))
 
-        backend.process(clock.tick())
         if args.record:
             scene.capture(os.path.join(args.record, "%04d.png" % frame))
+
+        backend.process(clock.tick())
 
     if args.record:
         import subprocess
