@@ -61,6 +61,14 @@ Sandpile fractal, from [this video](https://www.youtube.com/watch?v=1MtEUErz7Gg)
 
 Midi/Spectrogram based animation of iterated complex function fractal.
 
+[menger.py](animations/menger.py)
+
+![menger](animations/menger.png)
+![menger](animations/menger-2.png)
+![menger](animations/menger-3.png)
+![menger](animations/menger-4.png)
+
+
 [underwater-fractal-creature.py](animations/underwater-fractal-creature.py)
 
 ![underwater-fractal-creature](animations/underwater-fractal-creature.png)
