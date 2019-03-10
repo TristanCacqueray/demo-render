@@ -61,6 +61,14 @@ Sandpile fractal, from [this video](https://www.youtube.com/watch?v=1MtEUErz7Gg)
 
 Midi/Spectrogram based animation of iterated complex function fractal.
 
+[marble-menger.hy](animations/marble-menger.hy)
+
+![marble-menger](animations/marble-menger.png)
+![marble-menger](animations/marble-menger-2.png)
+![marble-menger](animations/marble-menger-3.png)
+![marble-menger](animations/marble-menger-4.png)
+
+
 [menger.py](animations/menger.py)
 
 ![menger](animations/menger.png)

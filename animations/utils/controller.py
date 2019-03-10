@@ -115,7 +115,7 @@ class Controller:
         for k, v in default.get("mods", {}).items():
             if k not in params.get("mods", {}):
                 params.setdefault("mods", {})[k] = v
-        self.start_params = copy.copy(params)
+        self.start_params = copy.deepcopy(params)
         # Apply variant
         if variant:
             for k, v in variant.items():
@@ -148,6 +148,8 @@ class Controller:
                 continue
             if mod_param.get("type") == "fine":
                 self.add_fine(mod)
+            elif mod_param.get("type") == "vec3":
+                self.add_vec3(mod, mod_param)
             else:
                 self.add_float(mod,
                                mod_param["min"], mod_param["max"],
@@ -168,8 +170,20 @@ class Controller:
         if not self.root:
             return
         for t, n, v in self.controllers:
-            value = self.params[n]
-            if t == "float":
+            if t == "vec3":
+                n, i = n.split('_')
+                if i == "x":
+                    idx = 0
+                elif i == "y":
+                    idx = 1
+                elif i == "z":
+                    idx = 2
+                else:
+                    raise RuntimeError("%s: Unknown vec3 idx" % i)
+                value = self.params[n][idx]
+            else:
+                value = self.params[n]
+            if t == "float" or t == "vec3":
                 v.set(value)
             else:
                 val, magnitude = list(map(lambda x: int(x.split('.')[0]),
@@ -188,7 +202,7 @@ class Controller:
                 row += 1
         return row
 
-    def add_float(self, name, from_, to, resolution=1):
+    def add_float(self, name, from_, to, resolution=1, ttype="float"):
         """Add simple slider"""
         r = self._get_row()
 
@@ -198,7 +212,7 @@ class Controller:
         tkinter.Label(self.root, text=name).grid(row=r, column=0)
         param.grid(row=r, column=1)
         param.bind("<ButtonRelease-1>", self.on_tkclic)
-        self.controllers.append(["float", name, param])
+        self.controllers.append([ttype, name, param])
 
     def add_fine(self, name):
         """Add 2 sliders, one for value, one for magnitude order"""
@@ -218,6 +232,15 @@ class Controller:
         param_mag.bind("<ButtonRelease-1>", self.on_tkclic)
         self.controllers.append(["fine", name, (param, param_mag)])
 
+    def add_vec3(self, name, mod_params):
+        """Add vec3 sliders"""
+        self.add_float(name + "_x", mod_params["min"], mod_params["max"],
+                       resolution=mod_params["resolution"], ttype="vec3")
+        self.add_float(name + "_y", mod_params["min"], mod_params["max"],
+                       resolution=mod_params["resolution"], ttype="vec3")
+        self.add_float(name + "_z", mod_params["min"], mod_params["max"],
+                       resolution=mod_params["resolution"], ttype="vec3")
+
     def on_tkclic(self, ev=None):
         # Read all sliders values
         for t, n, v in self.controllers:
@@ -226,7 +249,15 @@ class Controller:
                 self.params[n] = val
             if t == "float":
                 self.params[n] = v.get()
-                print("Setting", n, "to", v.get())
+            if t == "vec3":
+                n, i = n.split('_')
+                if i == "x":
+                    idx = 0
+                elif i == "y":
+                    idx = 1
+                elif i == "z":
+                    idx = 2
+                self.params[n][idx] = v.get()
         self.scene.draw = True
 
     def on_pygame_clic(self, ev):
@@ -358,7 +389,7 @@ class Controller:
         """Get modified params"""
         params = {}
         for k, v in self.start_params.items():
-            if self.params[k] != v:
+            if k != "iMat" and self.params[k] != v:
                 params[k] = self.params[k]
         return params
 

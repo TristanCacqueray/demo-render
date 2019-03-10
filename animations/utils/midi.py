@@ -243,7 +243,10 @@ class Midi:
             pos += 1 / fps
 
     def get(self, frame):
-        return self.frames[frame]
+        try:
+            return self.frames[frame]
+        except IndexError:
+            return []
 
 
 class NoMidi:

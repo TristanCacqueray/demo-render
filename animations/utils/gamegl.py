@@ -13,15 +13,17 @@
 import argparse
 import json
 import time
+import math
 import os
 import numpy as np
 from PIL import Image
 
-from glumpy import app, gl
+from glumpy import app, gl, glm, gloo
 from glumpy.app.window import key
 from glumpy.app.window.event import EventDispatcher
 
-from . audio import Audio, NoAudio
+from . controller import Controller
+from . audio import Audio, NoAudio, SpectroGram
 from . midi import Midi, NoMidi
 
 
@@ -29,12 +31,9 @@ class Window(EventDispatcher):
     alive = True
     draw = True
 
-    def __init__(self, winsize, screen, demo, record):
+    def __init__(self, winsize, screen):
         self.winsize = winsize
         self.window = screen
-        self.demo = demo
-        self.params = demo.params
-        self.dorecord = record
         self.init_program()
         self.fbuffer = np.zeros(
             (self.window.height, self.window.width * 3), dtype=np.uint8)
@@ -43,20 +42,314 @@ class Window(EventDispatcher):
         gl.glReadPixels(
             0, 0, self.window.width, self.window.height,
             gl.GL_RGB, gl.GL_UNSIGNED_BYTE, self.fbuffer)
-        image = Image.frombytes("RGB", self.winsize, self.fbuffer)
+        image = Image.frombytes("RGB", self.winsize, np.ascontiguousarray(np.flip(self.fbuffer, 0)))
         image.save(filename, 'png')
 
     def on_draw(self, dt):
         pass
 
     def on_resize(self, width, height):
-        print("on_resize!")
+        pass
 
     def on_key_press(self, k, modifiers):
         if k == key.ESCAPE:
             self.alive = False
         elif k == key.SPACE:
-            self.demo.paused = not self.demo.paused
+            self.paused = not self.paused
+        self.draw = True
+
+
+def fragment_loader(filename: str, export: bool):
+    final = []
+    uniforms = {"mods": {}}
+    shadertoy = False
+
+    def loader(lines: list):
+        for line in lines:
+            if line.startswith("#include"):
+                loader(open(os.path.join(os.path.dirname(filename),
+                                         line.split()[1][1:-1])
+                            ).read().split('\n'))
+            else:
+                export_line = ""
+                if line.startswith('uniform'):
+                    param = line.split()[2][:-1]
+                    param_type = line.split()[1]
+                    if param_type == "float":
+                        val = 0.
+                    elif param_type == "vec2":
+                        val = [0., 0.]
+                    elif param_type == "vec3":
+                        val = [0., 0., 0.]
+                    elif param_type == "vec4":
+                        val = [0., 0., 0., 0.]
+                    elif param_type == "mat4":
+                        val = np.eye(4, dtype=np.float32)
+                    else:
+                        raise RuntimeError("Unknown uniform %s" % line)
+                    if '//' in line:
+                        if 'slider' in line:
+                            slider_str = line[line.index('slider'):].split(
+                                '[')[1].split(']')[0]
+                            smi, sma, sre = list(map(
+                                float, slider_str.split(',')))
+                            uniforms["mods"][param] = {
+                                "type": param_type,
+                                "sliders": True,
+                                "min": smi,
+                                "max": sma,
+                                "resolution": sre,
+                            }
+                        val_str = line.split()[-1]
+                        if param_type == "float":
+                            val = float(val_str)
+                        elif param_type == "vec3":
+                            val = list(map(float, val_str.split(',')))
+                        uniforms[param] = val
+                        if shadertoy:
+                            if param_type.startswith("vec"):
+                                val_str = "%s%s" % (param_type, tuple(val))
+                            else:
+                                val_str = str(val)
+                            export_line = "const %s %s = %s;" % (
+                                param_type, param, val_str
+                            )
+                    elif param == "iMat":
+                        uniforms[param] = val
+                if export and export_line:
+                    final.append(export_line)
+                else:
+                    final.append(line)
+    fragment = open(filename).read()
+    if "void mainImage(" in fragment:
+        shadertoy = True
+        if not export:
+            final.append("""uniform vec2 iResolution;
+uniform vec4 iMouse;
+uniform float iTime;
+void mainImage(out vec4 fragColor, in vec2 fragCoord);
+void main(void) {mainImage(gl_FragColor, gl_FragCoord.xy);}""")
+    loader(fragment.split('\n'))
+    return "\n".join(final), uniforms
+
+
+class FragmentShader(Window):
+    """A class to simplify raymarcher/DE experiment"""
+    vertex = """
+attribute vec2 position;
+
+void main(void) {
+  gl_Position = vec4(position, 0., 1.);
+}
+"""
+    buttons = {
+        app.window.mouse.NONE: 0,
+        app.window.mouse.LEFT: 1,
+        app.window.mouse.MIDDLE: 2,
+        app.window.mouse.RIGHT: 3
+    }
+
+    def __init__(self, args):
+        self.fps = args.fps
+        self.record = args.record
+        self.old_program = None
+        self.load_program(args.fragment, args.export)
+        self.program_params = set(self.params.keys()) - set(('mods', ))
+        if args.params:
+            self.params.update(args.params)
+        self.iMat = self.params.get("iMat")
+        # Gimbal mode, always looking at the center
+        self.gimbal = True
+        if self.gimbal:
+            self.params.setdefault("horizontal_angle", 0.)
+            self.params.setdefault("vertical_angle", 0.)
+            self.params.setdefault("distance", 10.)
+        if self.iMat is not None:
+            self.horizontal_angle = self.params.get("horizontal_angle", 0.)
+            self.vertical_angle = self.params.get("vertical_angle", 0.)
+            self.setDirection()
+            if self.gimbal:
+                self.position = np.array([.0, .0, self.params["distance"]])
+            else:
+                self.position = np.array([.0, .0, 10.2])
+        self.controller = Controller(self.params, default={})
+        self.screen = app.Window(width=args.winsize[0], height=args.winsize[1])
+        super().__init__(args.winsize, self.screen)
+        self.controller.set(self.screen, self)
+        self.screen.attach(self)
+        self.paused = False
+
+    def load_program(self, fragment_path, export=False):
+        self.fragment_path = fragment_path
+        self.fragment_mtime = os.stat(fragment_path).st_mtime
+        self.fragment, self.params = fragment_loader(fragment_path, export)
+        self.iTime = "iTime" in self.fragment
+        self.iMouse = "iMouse" in self.fragment
+        if export:
+            print(self.fragment)
+            exit(0)
+
+    def init_program(self):
+        # Ensure size is set
+        #print("program param: ", self.program_params)
+        #print("---[")
+        #print(self.fragment)
+        #print("]---")
+        self.program = gloo.Program(self.vertex, self.fragment, count=4)
+        self.program['position'] = [(-1, -1), (-1, +1), (+1, -1), (+1, +1)]
+        # TODO: make those setting parameter
+        gl.glEnable(gl.GL_BLEND)
+        gl.glBlendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE_MINUS_SRC_ALPHA)
+        self.on_resize(*self.winsize)
+        if self.iMouse:
+            self.program["iMouse"] = self.iMouse
+
+    def update(self, frame):
+        mtime = os.stat(self.fragment_path).st_mtime
+        if mtime > self.fragment_mtime:
+            self.old_program = self.program
+            self.load_program(self.fragment_path)
+            self.init_program()
+        if self.controller.root:
+            self.controller.root.update()
+        if self.paused:
+            return self.draw
+        self.draw = True
+        return self.draw
+
+    def render(self, dt):
+        self.window.clear()
+        if self.iMat is not None:
+            self.iMat = np.eye(4, dtype=np.float32)
+            if not self.gimbal:
+                glm.xrotate(self.iMat, self.horizontal_angle)
+                glm.yrotate(self.iMat, self.vertical_angle)
+            else:
+                self.position = [0., 0., self.params["distance"]]
+            glm.translate(self.iMat, *self.position)
+            if self.gimbal:
+                glm.xrotate(self.iMat, self.params["horizontal_angle"])
+                glm.yrotate(self.iMat, self.params["vertical_angle"])
+            self.params["iMat"] = self.iMat
+        for p in self.program_params:
+            self.program[p] = self.params[p]
+        dt = dt / self.fps
+
+        if self.iTime:
+            self.program["iTime"] = dt
+        try:
+            self.program.draw(gl.GL_TRIANGLE_STRIP)
+            if self.old_program:
+                self.old_program.delete()
+                del self.old_program
+                self.old_program = None
+                print("Loaded new program!")
+        except RuntimeError:
+            if not self.old_program:
+                raise
+            self.old_program.draw(gl.GL_TRIANGLE_STRIP)
+            self.program.delete()
+            del self.program
+            self.program = self.old_program
+            self.old_program = None
+            self.paused = True
+
+    def on_resize(self, width, height):
+        self.program["iResolution"] = width, height
+        self.winsize = (width, height)
+        self.draw = True
+
+    def setDirection(self):
+        v = math.radians(self.vertical_angle) * -1
+        h = math.radians(self.horizontal_angle)
+        if self.vertical_angle > 90 or self.vertical_angle < -90:
+            # Not sure why this is needed...
+            h *= -1
+        self.front_direction = np.array([
+            math.sin(v),
+            math.cos(v) * math.sin(h),
+            math.cos(v) * math.cos(h),
+        ])
+        self.right_direction = np.array([
+            math.sin(v - math.pi / 2.),
+            0,
+            math.cos(v - math.pi / 2.)
+        ])
+        self.up_direction = np.cross(
+            self.right_direction, self.front_direction)
+        #print("vert %.1f, horz %.1f, front_direction: %s" % (
+        #    self.vertical_angle, self.horizontal_angle,
+        #    ",".join(list(map(lambda x: "%.1f" % x, self.front_direction)))))
+
+    def on_mouse_drag(self, x, y, dx, dy, button):
+        if self.iMat is not None:
+            self.horizontal_angle += dy / 5
+            self.vertical_angle += dx / 10
+            # Prevent being up side down
+            #if self.horizontal_angle > 90:
+            #    self.horizontal_angle = 90
+            #elif self.horizontal_angle < -90:
+            #    self.horizontal_angle = -90
+            # Clamp angle from -180 to 180
+            self.horizontal_angle = (180 + self.horizontal_angle) % 360 - 180
+            self.vertical_angle = (180 + self.vertical_angle) % 360 - 180
+            if self.gimbal:
+                self.params["horizontal_angle"] = \
+                    (180 + self.params["horizontal_angle"] + dy / 5) % 360 - 180
+                self.params["vertical_angle"] = \
+                    (180 + self.params["vertical_angle"] + dx / 10) % 360 - 180
+            self.setDirection()
+        elif self.iMouse:
+            self.iMouse = x, self.winsize[1] - y, self.buttons[button], 0
+            self.program["iMouse"] = self.iMouse
+            if "pitch" in self.params:
+                self.params["pitch"] -= dy / 50
+            if "yaw" in self.params:
+                self.params["yaw"] += dx / 50
+        self.draw = True
+
+    def on_mouse_release(self, x, y, button):
+        if self.iMouse:
+            self.program["iMouse"] = x, self.winsize[1] - y, 0, 0
+
+    def on_mouse_scroll(self, x, y, dx, dy):
+        if self.gimbal:
+            self.params["distance"] -= 0.1 * dy
+        if "fov" in self.params:
+            self.params["fov"] += self.params["fov"] / 10 * dy
+        self.draw = True
+
+    def on_key_press(self, k, modifiers):
+        super().on_key_press(k, modifiers)
+        if self.iMat is not None:
+            s = 0.1
+            if k == 87:    # z
+                self.position -= self.front_direction * s
+            elif k == 83:  # s
+                self.position += self.front_direction * s
+            elif k == 65:  # a
+                self.position += self.right_direction * s
+            elif k == 68:  # d
+                self.position -= self.right_direction * s
+            elif k == 69:  # a
+                self.position += self.up_direction * s
+            elif k == 81:  # b
+                self.position -= self.up_direction * s
+            # print(",".join(list(map(lambda x: "%.1f" % x, self.position))))
+        elif "cam" in self.params:
+            s = 0.1
+            if k == 87:  # z
+                self.params['cam'][2] += s
+            if k == 83:  # s
+                self.params['cam'][2] -= s
+            if k == 65:  # a
+                self.params['cam'][0] -= s
+            if k == 68:  # d
+                self.params['cam'][0] += s
+            if k == 69:  # a
+                self.params["cam"][1] += s
+            if k == 81:  # b
+                self.params["cam"][1] -= s
         self.draw = True
 
 
@@ -71,16 +364,102 @@ def usage():
     parser.add_argument("--skip", default=0, type=int, metavar="FRAMES_NUMBER")
     parser.add_argument("--size", type=float, default=8,
                         help="render size")
+    parser.add_argument("--export", action="store_true")
+    parser.add_argument("--params", help="manual parameters")
+    parser.add_argument("fragment", help="fragment file",
+                        nargs='?')
     args = parser.parse_args()
+
+    if args.params is not None:
+        if os.path.exists(args.params):
+            args.params = json.loads(open(args.params))
+        else:
+            args.params = json.loads(args.params)
+
     args.winsize = list(map(lambda x: int(x * args.size), [160,  90]))
     args.map_size = list(map(lambda x: x//5, args.winsize))
     return args
 
 
+def main(modulator):
+    args = usage()
+    scene = FragmentShader(args)
+    backend = app.__backend__
+    clock = app.__init__(backend=backend, framerate=args.fps)
+    scene.alive = True
+    frame = args.skip
+    if args.wav:
+        audio = Audio(args.wav, args.fps, play=not args.record)
+    else:
+        audio = NoAudio()
+    if args.midi:
+        midi = Midi(args.midi)
+    else:
+        midi = NoMidi()
+
+    mod = modulator(scene.params)
+    scene.controller.update_sliders()
+
+    spectre = SpectroGram(audio.blocksize)
+
+    audio.play = False
+    for skip in range(args.skip):
+        audio_buf = audio.get(frame)
+        spectre.transform(audio_buf)
+        mod(skip, spectre, midi.get(args.midi_skip + skip))
+    audio.play = not args.record
+
+    scene.alive = True
+
+    if args.paused:
+        scene.paused = True
+        args.paused = False
+
+    frame = args.skip
+    while scene.alive:
+        start_time = time.monotonic()
+        if not scene.paused:
+            audio_buf = audio.get(frame)
+            if audio_buf is not None:
+                spectre.transform(audio_buf)
+            midi_events = midi.get(args.midi_skip + frame)
+            if midi_events:
+                print(midi_events)
+            if mod(frame, spectre, midi.get(args.midi_skip + frame)):
+                print("Setting alive to false")
+                scene.alive = False
+            frame += 1
+            scene.controller.update_sliders()
+        scene.controller.root.update()
+        if scene.update(frame):
+            scene.render(frame)
+
+            if args.record:
+                scene.capture(os.path.join(args.record, "%04d.png" % frame))
+
+            print("%04d: %.2f sec '%s'" % (
+                frame, time.monotonic() - start_time,
+                json.dumps(scene.controller.get(), sort_keys=True)))
+            scene.draw = False
+
+        backend.process(clock.tick())
+
+    if args.record:
+        import subprocess
+        cmd = [
+            "ffmpeg", "-y", "-framerate", str(args.fps),
+            "-i", "%s/%%04d.png" % args.record,
+            "-i", args.wav,
+            "-c:a", "libvorbis", "-c:v", "copy",
+            "%s/render.mp4" % (args.record)]
+        print("Running: %s" % " ".join(cmd))
+        subprocess.Popen(cmd).wait()
+
+
 def run_main(demo, Scene):
     args = usage()
     screen = app.Window(width=args.winsize[0], height=args.winsize[1])
-    scene = Scene(args.winsize, screen, demo, args.record)
+    scene = Scene(args.winsize, screen)
     screen.attach(scene)
 
     backend = app.__backend__
