@@ -11,11 +11,13 @@
 # under the License.
 
 import argparse
+import collections
 import json
 import time
 import math
 import os
 import numpy as np
+import copy
 from PIL import Image
 
 from glumpy import app, gl, glm, gloo
@@ -37,6 +39,7 @@ class Window(EventDispatcher):
         self.init_program()
         self.fbuffer = np.zeros(
             (self.window.height, self.window.width * 3), dtype=np.uint8)
+        super().__init__()
 
     def capture(self, filename):
         gl.glReadPixels(
@@ -59,7 +62,7 @@ class Window(EventDispatcher):
         self.draw = True
 
 
-def fragment_loader(filename: str, export: bool):
+def fragment_loader(fragment: str, export: bool, filename=None):
     final = []
     uniforms = {"mods": {}}
     shadertoy = False
@@ -72,12 +75,12 @@ def fragment_loader(filename: str, export: bool):
                             ).read().split('\n'))
             else:
                 export_line = ""
-                if line.startswith('uniform'):
+                if line.lstrip().startswith('uniform'):
                     param = line.split()[2][:-1]
                     param_type = line.split()[1]
                     if param_type == "float":
                         val = 0.
-                    elif param_type == "vec2":
+                    elif param_type in ("vec2", "dvec2"):
                         val = [0., 0.]
                     elif param_type == "vec3":
                         val = [0., 0., 0.]
@@ -103,7 +106,7 @@ def fragment_loader(filename: str, export: bool):
                         val_str = line.split()[-1]
                         if param_type == "float":
                             val = float(val_str)
-                        elif param_type == "vec3":
+                        elif param_type in ("vec2", "vec3"):
                             val = list(map(float, val_str.split(',')))
                         uniforms[param] = val
                         if shadertoy:
@@ -114,13 +117,12 @@ def fragment_loader(filename: str, export: bool):
                             export_line = "const %s %s = %s;" % (
                                 param_type, param, val_str
                             )
-                    elif param == "iMat":
+                    else:
                         uniforms[param] = val
                 if export and export_line:
                     final.append(export_line)
                 else:
                     final.append(line)
-    fragment = open(filename).read()
     if "void mainImage(" in fragment:
         shadertoy = True
         if not export:
@@ -142,6 +144,28 @@ void main(void) {
   gl_Position = vec4(position, 0., 1.);
 }
 """
+    dot_vertex = """
+attribute vec2 position;
+attribute float age;
+varying float v_age;
+
+void main(void) {
+  v_age = age;
+  gl_Position = vec4(position, 0., 1.);
+  gl_PointSize = 4.0;
+}
+"""
+    dot_fragment = """
+varying float v_age;
+void main() {
+    float sd = length(gl_PointCoord.xy - vec2(.5))  - 2 * v_age;
+    if (sd < 0.) {
+      gl_FragColor = vec4(1.0);
+    } else {
+      discard;
+    }
+}
+"""
     buttons = {
         app.window.mouse.NONE: 0,
         app.window.mouse.LEFT: 1,
@@ -149,14 +173,23 @@ void main(void) {
         app.window.mouse.RIGHT: 3
     }
 
-    def __init__(self, args):
+    def __init__(self, args, fragment=None, winsize=None, title=None):
         self.fps = args.fps
         self.record = args.record
         self.old_program = None
-        self.load_program(args.fragment, args.export)
-        self.program_params = set(self.params.keys()) - set(('mods', ))
-        if args.params:
-            self.params.update(args.params)
+        if fragment is None:
+            fragment = args.fragment
+        if winsize:
+            args.winsize = list(map(int, winsize))
+        self.title = title
+        self.load_program(fragment, args.export)
+        self.params = args.params
+        if self.params:
+            self.program_params = set(self._params.keys()).intersection(
+                set(self.params.keys())) - {"mods"}
+        else:
+            self.params = self._params
+            self.program_params = set(self._params.keys()) - {"mods"}
         self.iMat = self.params.get("iMat")
         # Gimbal mode, always looking at the center
         self.gimbal = True
@@ -172,17 +205,31 @@ void main(void) {
                 self.position = np.array([.0, .0, self.params["distance"]])
             else:
                 self.position = np.array([.0, .0, 10.2])
-        self.controller = Controller(self.params, default={})
-        self.screen = app.Window(width=args.winsize[0], height=args.winsize[1])
+        if title != "Map":
+            self.controller = Controller(self.params, default={})
+        else:
+            self.controller = None
+        self.screen = app.Window(
+            width=args.winsize[0], height=args.winsize[1], title=title)
         super().__init__(args.winsize, self.screen)
-        self.controller.set(self.screen, self)
+        if self.controller:
+            self.controller.set(self.screen, self)
         self.screen.attach(self)
         self.paused = False
+        self.prev_params = {}
 
     def load_program(self, fragment_path, export=False):
-        self.fragment_path = fragment_path
-        self.fragment_mtime = os.stat(fragment_path).st_mtime
-        self.fragment, self.params = fragment_loader(fragment_path, export)
+        if os.path.exists(fragment_path):
+            fragment = open(fragment_path).read()
+            fn = fragment_path
+            self.fragment_path = fragment_path
+            self.fragment_mtime = os.stat(fragment_path).st_mtime
+        else:
+            fragment = fragment_path
+            fn = None
+            self.fragment_mtime = None
+
+        self.fragment, self._params = fragment_loader(fragment, export, fn)
         self.iTime = "iTime" in self.fragment
         self.iMouse = "iMouse" in self.fragment
         if export:
@@ -195,8 +242,18 @@ void main(void) {
         #print("---[")
         #print(self.fragment)
         #print("]---")
-        self.program = gloo.Program(self.vertex, self.fragment, count=4)
+        self.program = gloo.Program(self.vertex, self.fragment, count=4, version="450")
         self.program['position'] = [(-1, -1), (-1, +1), (+1, -1), (+1, +1)]
+        if self.title == "Map":
+            self.point_history = collections.deque(maxlen=250)
+            self.point_program = gloo.Program(
+                self.dot_vertex,
+                self.dot_fragment,
+                count=self.point_history.maxlen)
+            self.point_program['position'] = np.zeros(
+                (self.point_history.maxlen, 2), dtype=np.float32) - 2.0
+            self.point_program['age'] = np.zeros(self.point_history.maxlen,
+                                                 dtype=np.float32)
         # TODO: make those setting parameter
         gl.glEnable(gl.GL_BLEND)
         gl.glBlendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE_MINUS_SRC_ALPHA)
@@ -205,19 +262,32 @@ void main(void) {
             self.program["iMouse"] = self.iMouse
 
     def update(self, frame):
-        mtime = os.stat(self.fragment_path).st_mtime
-        if mtime > self.fragment_mtime:
-            self.old_program = self.program
-            self.load_program(self.fragment_path)
-            self.init_program()
-        if self.controller.root:
+        if self.fragment_mtime:
+            mtime = os.stat(self.fragment_path).st_mtime
+            if mtime > self.fragment_mtime:
+                self.old_program = self.program
+                self.load_program(self.fragment_path)
+                self.init_program()
+        if self.controller and self.controller.root:
             self.controller.root.update()
+        if self.title == "Map":
+            # Check for new seed position
+            if not len(self.point_history) or \
+               self.point_history[-1] != self.params["seed"]:
+                self.add_point(copy.copy(self.params["seed"]))
+                self.draw = True
+        try:
+            if self.prev_params != self.params:
+                self.draw = True
+        except ValueError:
+            pass
         if self.paused:
             return self.draw
         self.draw = True
         return self.draw
 
     def render(self, dt):
+        self.window.activate()
         self.window.clear()
         if self.iMat is not None:
             self.iMat = np.eye(4, dtype=np.float32)
@@ -253,6 +323,12 @@ void main(void) {
             self.program = self.old_program
             self.old_program = None
             self.paused = True
+
+        if self.title == "Map":
+            gl.glEnable(gl.GL_BLEND)
+            gl.glBlendFunc(gl.GL_ONE_MINUS_DST_COLOR, gl.GL_ZERO)
+            self.point_program.draw(gl.GL_POINTS)
+        self.prev_params = copy.deepcopy(self.params)
 
     def on_resize(self, width, height):
         self.program["iResolution"] = width, height
@@ -308,11 +384,83 @@ void main(void) {
                 self.params["yaw"] += dx / 50
         self.draw = True
 
+    def normalizeCoord(self, x, y):
+        uv = [
+            2 * x / self.winsize[0] - 1,
+            2 * y / self.winsize[1] - 1,
+        ]
+        uv[1] *= self.winsize[1] / self.winsize[0]
+        return uv
+
+    def add_point(self, seed):
+        center = self.params["map_center"]
+        ratio = self.winsize[1] / self.winsize[0]
+        self.point_history.append(seed)
+        if seed[0] < (center[0] - self.params["map_range"]) or \
+           seed[0] > (center[0] + self.params["map_range"]) or \
+           seed[1] < (center[1] - self.params["map_range"] * ratio) or \
+           seed[1] > (center[1] + self.params["map_range"] * ratio):
+            print("Recentering the map")
+            self.params["map_center"] = seed
+        self.update_points_position()
+
+    def update_points_position(self):
+        center = self.params["map_center"]
+        mrange = self.params["map_range"]
+        ratio = self.winsize[1] / self.winsize[0]
+        count = len(self.point_history)
+        for idx in range(count):
+            seed = self.point_history[idx]
+            self.point_program["position"][idx] = [
+                (seed[0] - center[0]) / (mrange),
+                -1 * (seed[1] - center[1]) / (mrange * ratio)
+            ]
+            self.point_program["age"][idx] = (idx + 1) / count
+
+    def updateCenter(self, x, y):
+        uv = self.normalizeCoord(x, y)
+        if self.title == 'Map':
+            self.update_points_position()
+            prefix = 'map_'
+            range = self.params["map_range"]
+        else:
+            prefix = ''
+            range = self.params["range"]
+        self.params[prefix + "center"] = [
+            self.params[prefix + "center"][0] + uv[0] * range,
+            self.params[prefix + "center"][1] + uv[1] * range,
+        ]
+
+    def updateSeed(self, x, y):
+        uv = self.normalizeCoord(x, y)
+        self.params["seed"] = [
+            self.params["map_center"][0] + uv[0] * self.params["map_range"],
+            self.params["map_center"][1] + uv[1] * self.params["map_range"],
+        ]
+
+    def on_mouse_press(self, x, y, button):
+        if self.title == "Map" and button == 4:
+            self.updateSeed(x, y)
+        if "center" in self.params and button != 4:
+            self.updateCenter(x, y)
+            self.draw = True
+        if self.title == "Map" and button != 4:
+            self.update_points_position()
+
     def on_mouse_release(self, x, y, button):
         if self.iMouse:
             self.program["iMouse"] = x, self.winsize[1] - y, 0, 0
 
     def on_mouse_scroll(self, x, y, dx, dy):
+        if "range" in self.params:
+            if self.title == 'Map':
+                range = 'map_range'
+            else:
+                range = 'range'
+            self.params[range] -= self.params[range] / 10 * dy
+            if self.title == "Map":
+                self.update_points_position()
+            self.gimbal = False
         if self.gimbal:
             self.params["distance"] -= 0.1 * dy
         if "fov" in self.params:
@@ -350,6 +498,22 @@ void main(void) {
                 self.params["cam"][1] += s
             if k == 81:  # b
                 self.params["cam"][1] -= s
+        elif "seed" in self.params:
+            idx = None
+            if k == 87:  # z
+                idx = 1
+                d = -1
+            if k == 83:  # s
+                idx = 1
+                d = 1
+            if k == 65:  # a
+                idx = 0
+                d = -1
+            if k == 68:  # d
+                idx = 0
+                d = 1
+            if idx is not None:
+                self.params["seed"][idx] += d * self.params["map_range"] / 10
         self.draw = True
 
 
@@ -357,6 +521,8 @@ def usage():
     parser = argparse.ArgumentParser()
     parser.add_argument("--paused", action='store_true')
     parser.add_argument("--record", metavar="DIR", help="record frame in png")
+    parser.add_argument("--super-sampling", type=int, default=1,
+                        help="super sampling mode")
     parser.add_argument("--wav", metavar="FILE")
     parser.add_argument("--midi", metavar="FILE")
     parser.add_argument("--midi_skip", type=int, default=0)
@@ -375,6 +541,8 @@ def usage():
             args.params = json.loads(open(args.params))
         else:
             args.params = json.loads(args.params)
+    else:
+        args.params = {}
 
     args.winsize = list(map(lambda x: int(x * args.size), [160,  90]))
     args.map_size = list(map(lambda x: x//5, args.winsize))
