@@ -15,6 +15,8 @@
 ;; Primitive procedures
 (defn compose [f g]
   (fn [x] (f (g x))))
+(defn combine [f g]
+  (fn [x] (+ (f x) (g x))))
 
 (defn repeat [f n]
   (if (= n 1)

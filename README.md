@@ -61,6 +61,14 @@ Sandpile fractal, from [this video](https://www.youtube.com/watch?v=1MtEUErz7Gg)
 
 Midi/Spectrogram based animation of iterated complex function fractal.
 
+[livet-nediser.hy](animations/livet-nediser.hy)
+
+![livet-nediser](animations/livet-nediser.png)
+![livet-nediser](animations/livet-nediser-2.png)
+![livet-nediser](animations/livet-nediser-3.png)
+![livet-nediser](animations/livet-nediser-4.png)
+
+
 [orbital3.hy](animations/orbital3.hy)
 
 ![orbital3](animations/orbital3.png)
