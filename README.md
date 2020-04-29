@@ -61,12 +61,31 @@ Sandpile fractal, from [this video](https://www.youtube.com/watch?v=1MtEUErz7Gg)
 
 Midi/Spectrogram based animation of iterated complex function fractal.
 
+The general design is that each frame undergoes:
+
+* Input procedures to collect raw data such as audio or midi events.
+* Modulations procedures to normalize the raw data.
+* Scene procedures to transform the modulation into rendering parameters.
+* Output procedures to generate visualization.
+
+This design evolved over time, here are some interesting milestones:
+
+* Using hylang is more ergonomic to write scenes:
+  * [Before](animations/underwater-fractal-creature.py#L172-L177)
+  * [After](animations/marble-menger.hy#L80-L84)
+
+* Fragment shader can be written in the host language, mostly for elegance, [hy2glsl example](animations/livet-nediser.hy#L24-L70).
+
+* The modulation amount can be [pre-computed](animations/livet-nediser.hy#L145) so that for a scene, a modulation can be expressed as:
+  * `(scene "intro" end-value (move-seed 0 rhode))` where the amount of "rhode" will match the end value target,
+  * Instead of `(update "trap1_offset" (* rhode 1e-1))` where the amount of "rhode" is picked arbritarily without an end value target.
+
+
 [livet-nediser.hy](animations/livet-nediser.hy)
 
 ![livet-nediser](animations/livet-nediser.png)
 ![livet-nediser](animations/livet-nediser-2.png)
 ![livet-nediser](animations/livet-nediser-3.png)
-![livet-nediser](animations/livet-nediser-4.png)
 
 
 [orbital3.hy](animations/orbital3.hy)
