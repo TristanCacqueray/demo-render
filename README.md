@@ -1,5 +1,9 @@
 This repository contains standalone program to render digital art.
 
+Checkout git commit on update to get a working reproducer, or look at
+[demo-code](https://github.com/TristanCacqueray/demo-code) reference
+implementation.
+
 # [quack.py](quack.py)
 
 The duck set fractal, from
